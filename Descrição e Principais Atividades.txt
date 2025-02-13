@@ -2,7 +2,7 @@
 
 # Tema: Streaming de séries e filmes
 
-# Descrição: Aplicativo de streaming que permite assistir filmes e séries após cadastro prévio.
+# Descrição: Aplicativo de streaming gratuito que permite assistir filmes e séries após cadastro prévio.
 
 #Principais Atividades:
 #1: Cadastro de usuários

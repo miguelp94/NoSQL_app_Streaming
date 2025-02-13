@@ -1,0 +1,9 @@
+#11/02/2025
+
+# Tema: Streaming de séries e filmes
+
+# Descrição: Aplicativo de streaming que permite assistir filmes e séries após cadastro prévio.
+
+#Principais Atividades:
+#1: Cadastro de usuários
+#2: Busca de filmes/séries

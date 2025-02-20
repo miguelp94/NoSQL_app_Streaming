@@ -7,3 +7,54 @@
 #Principais Atividades:
 #1: Cadastro de usuários
 #2: Busca de filmes/séries
+
+#1. Coleção usuarios (Cadastro de usuários)
+
+{
+  "_id": "usr_12345",
+  "nome": "Miguel Araujo",
+  "email": "miguel.araujo@ufu.br",
+  "senha_hash": "hash_da_senha",
+  "data_cadastro": "2025-02-20T14:30:00Z",
+  "preferencias": ["Ação", "Ficção Científica"],
+  "historico_visualizacao": [
+    {
+      "filme_id": "flm_98765",
+      "data_visualizacao": "2025-02-18T20:15:00Z",
+      "progresso": 85
+    }
+  ]
+}
+
+#2. Coleção filmes_series (Catálogo de filmes e séries)
+
+{
+  "_id": "flm_98765",
+  "titulo": "O Senhor dos Anéis: A Sociedade do Anel",
+  "tipo": "Filme",
+  "generos": ["Aventura", "Fantasia"],
+  "ano_lancamento": 2001,
+  "duracao_minutos": 178,
+  "classificacao_indicativa": "12",
+  "avaliacao_media": 4.8,
+  "disponibilidade": ["Brasil", "Portugal"],
+  "elenco": [
+    { "ator": "Elijah Wood", "personagem": "Frodo" },
+    { "ator": "Ian McKellen", "personagem": "Gandalf" }
+  ]
+}
+
+
+#3. Coleção buscas (Registro de buscas feitas pelos usuários)
+
+{
+  "_id": "bsq_56789",
+  "usuario_id": "usr_12345",
+  "termo_busca": "Senhor dos Anéis",
+  "filtros": {
+    "genero": "Fantasia",
+    "ano_min": 2000,
+    "ano_max": 2010
+  },
+  "data_busca": "2025-02-20T14:45:00Z"
+}

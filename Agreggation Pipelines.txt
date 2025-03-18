@@ -1,0 +1,79 @@
+a) Filmes Mais Assistidos
+
+db.usuarios.aggregate([
+  { $unwind: "$historico_visualizacao" }, // Desestrutura o array de histórico
+  {
+    $group: {
+      _id: "$historico_visualizacao.filme_id", // Agrupa por filme_id
+      total_visualizacoes: { $sum: 1 } // Conta o número de visualizações
+    }
+  },
+  {
+    $lookup: { // Junta com a coleção filmes_series
+      from: "filmes_series",
+      localField: "_id",
+      foreignField: "_id",
+      as: "filme"
+    }
+  },
+  { $unwind: "$filme" }, // Desestrutura o array de filmes
+  {
+    $project: { // Seleciona os campos desejados
+      titulo: "$filme.titulo",
+      total_visualizacoes: 1
+    }
+  },
+  { $sort: { total_visualizacoes: -1 } } // Ordena por visualizações (decrescente)
+]);
+
+
+b) Preferências dos Usuários
+
+db.usuarios.aggregate([
+  { $unwind: "$preferencias" }, // Desestrutura o array de preferências
+  {
+    $group: {
+      _id: "$preferencias", // Agrupa por gênero
+      total_usuarios: { $sum: 1 } // Conta o número de usuários
+    }
+  },
+  { $sort: { total_usuarios: -1 } } // Ordena por total de usuários (decrescente)
+]);
+
+
+c) Buscas Mais Frequentes
+
+db.buscas.aggregate([
+  {
+    $group: {
+      _id: "$termo_busca", // Agrupa por termo de busca
+      total_buscas: { $sum: 1 } // Conta o número de buscas
+    }
+  },
+  { $sort: { total_buscas: -1 } } // Ordena por total de buscas (decrescente)
+]);
+
+
+d) Histórico de Visualização por Usuário
+
+db.usuarios.aggregate([
+  { $match: { _id: "usr_1" } }, // Filtra por usuário específico
+  { $unwind: "$historico_visualizacao" }, // Desestrutura o array de histórico
+  {
+    $lookup: { // Junta com a coleção filmes_series
+      from: "filmes_series",
+      localField: "historico_visualizacao.filme_id",
+      foreignField: "_id",
+      as: "filme"
+    }
+  },
+  { $unwind: "$filme" }, // Desestrutura o array de filmes
+  {
+    $project: { // Seleciona os campos desejados
+      titulo: "$filme.titulo",
+      data_visualizacao: "$historico_visualizacao.data_visualizacao",
+      progresso: "$historico_visualizacao.progresso"
+    }
+  },
+  { $sort: { data_visualizacao: -1 } } // Ordena por data de visualização (decrescente)
+]);

@@ -17,8 +17,6 @@ def conectar_banco():
         # MongoDB
         mongo_client = MongoClient(MONGO_URI)
         db = mongo_client[DB_NAME]
-        
-        # Testa conexão com MongoDB
         db.command('ping')
         
         # Redis
@@ -36,78 +34,81 @@ def conectar_banco():
         print(f"❌ Erro de conexão: {e}")
         return None, None
 
-# --- Função Principal --- #
-def buscar_filme_com_cache(filme_id, redis_client, db):
-    """
-    Busca filme no cache (Redis), se não achar, consulta MongoDB e armazena no cache.
-    """
-    if redis_client is None or db is None:
-        raise ValueError("Conexões com bancos não estabelecidas")
-    
+# --- Key-Value (Cache de Filmes) --- #
+def cache_filme(filme_id, redis_client, db):
+    """Implementação Key-Value para cache de filmes"""
     CACHE_KEY = f"filme:{filme_id}"
     
-    try:
-        # 1. Tentativa de obter do cache
-        filme_cache = redis_client.get(CACHE_KEY)
-        
-        if filme_cache:
-            print("🟢 Cache hit - Dados do Redis")
-            return json.loads(filme_cache)
-        
-        print("🔴 Cache miss - Consultando MongoDB...")
-        
-        # 2. Consulta ao MongoDB
-        # Verifica se o ID está no formato correto
-        try:
-            filme_id_obj = ObjectId(filme_id) if len(filme_id) == 24 else filme_id
-        except:
-            filme_id_obj = filme_id
-            
-        filme = db.filmes_series.find_one({"_id": filme_id_obj})
-        
-        if not filme:
-            print("⚠️ Filme não encontrado no MongoDB")
-            return None
-        
-        # Converte ObjectId para string e prepara para cache
+    # GET
+    filme_cache = redis_client.get(CACHE_KEY)
+    if filme_cache:
+        print("🟢 Cache hit - Dados do Redis")
+        return json.loads(filme_cache)
+    
+    print("🔴 Cache miss - Consultando MongoDB...")
+    
+    # SET após consulta ao MongoDB
+    filme_id_obj = ObjectId(filme_id) if len(filme_id) == 24 else filme_id
+    filme = db.filmes_series.find_one({"_id": filme_id_obj})
+    
+    if filme:
         filme['_id'] = str(filme['_id'])
-        filme_json = json.dumps(filme, default=str)
-        
-        # 3. Armazena no Redis por 1 hora (3600 segundos)
         redis_client.setex(
             CACHE_KEY,
             timedelta(seconds=3600),
-            filme_json
+            json.dumps(filme, default=str)
         )
-        
-        return filme
-        
-    except Exception as e:
-        print(f"⚠️ Erro durante operação: {e}")
-        return None
+    return filme
+
+# --- Listas (Histórico de Acesso) --- #
+def adicionar_historico(usuario_id, filme_id, redis_client):
+    """Implementação com Listas para histórico de acesso"""
+    HISTORICO_KEY = f"historico:{usuario_id}"
+    
+    # RPUSH - Adiciona no final da lista
+    redis_client.rpush(HISTORICO_KEY, filme_id)
+    
+    # Mantém apenas os 10 mais recentes
+    redis_client.ltrim(HISTORICO_KEY, -10, -1)
+
+def obter_historico(usuario_id, redis_client):
+    """LRANGE - Recupera toda a lista"""
+    HISTORICO_KEY = f"historico:{usuario_id}"
+    return redis_client.lrange(HISTORICO_KEY, 0, -1)
+
+# --- Sets (Tags de Filmes) --- #
+def adicionar_tags(filme_id, tags, redis_client):
+    """SADD - Adiciona tags únicas"""
+    TAGS_KEY = f"tags:{filme_id}"
+    redis_client.sadd(TAGS_KEY, *tags)
+
+def obter_tags(filme_id, redis_client):
+    """SMEMBERS - Recupera todas as tags"""
+    TAGS_KEY = f"tags:{filme_id}"
+    return redis_client.smembers(TAGS_KEY)
 
 # --- Uso na Aplicação --- #
 if __name__ == "__main__":
-    # Conecta aos bancos
     db, redis_client = conectar_banco()
     
-    # Verificação correta das conexões
     if db is not None and redis_client is not None:
         try:
-            # Teste com um ID que existe no seu banco
-            print("\nBusca por filme existente:")
-            filme_id_valido = "flm_9"  # Substitua por um ID válido do seu banco
-            filme = buscar_filme_com_cache(filme_id_valido, redis_client, db)
-            print("Resultado:", filme)
+            # 1. Exemplo Key-Value
+            print("\n=== KEY-VALUE (Cache de Filmes) ===")
+            filme = cache_filme("flm_9", redis_client, db)
+            print("Filme:", filme)
             
-            # Teste com ID inválido
-            print("\nBusca por filme inexistente:")
-            filme = buscar_filme_com_cache("id_inexistente", redis_client, db)
-            print("Resultado:", filme)
+            # 2. Exemplo Listas
+            print("\n=== LISTAS (Histórico) ===")
+            adicionar_historico("usr_1", "flm_9", redis_client)
+            adicionar_historico("usr_1", "flm_5", redis_client)
+            print("Histórico:", obter_historico("usr_1", redis_client))
+            
+            # 3. Exemplo Sets
+            print("\n=== SETS (Tags) ===")
+            adicionar_tags("flm_9", ["ação", "ficção", "aventura"], redis_client)
+            print("Tags:", obter_tags("flm_9", redis_client))
             
         finally:
-            # Fecha conexões
             redis_client.close()
             db.client.close()
-    else:
-        print("❌ Não foi possível iniciar a aplicação devido a erros de conexão")

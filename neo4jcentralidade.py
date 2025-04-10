@@ -1,43 +1,55 @@
 from graphdatascience import GraphDataScience
-from neo4j import GraphDatabase
+from pymongo import MongoClient
+from bson import ObjectId
 
-# Conexão com o Neo4j Aura
-NEO4J_URI = "bolt+s://c06feaf2.databases.neo4j.io"
-NEO4J_USER = "neo4j"
-NEO4J_PASSWORD = "E2yvIk15oJcELi0P7jdmxCIndyyYH3T9WGRx_04elXg"
+# === Conexão com MongoDB ===
+mongo_client = MongoClient(
+    "mongodb+srv://filipemiguel3m:ho28QZpfrItn9LMC@cluster0.j3k6e.mongodb.net/?retryWrites=true&w=majority&tls=true"
+)
+db = mongo_client["Cluster0"]
+usuarios_collection = db["usuarios"]
 
-# Conectando ao GDS
-gds = GraphDataScience(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+# === Conexão com Neo4j Desktop ===
+GDS_URI = "bolt://localhost:7687"
+GDS_USER = "neo4j"
+GDS_PASSWORD = "E2yvIk15oJcELi0P7jdmxCIndyyYH3T9WGRx_04elXg"
 
-# ------------------------
-# 1. Cria grafo projetado
-# ------------------------
+# === Inicializa GDS ===
+gds = GraphDataScience(GDS_URI, auth=(GDS_USER, GDS_PASSWORD))
+
+# === Limpa grafo anterior, se existir ===
+try:
+    gds.graph.drop("usuarios_similares", False)
+except:
+    print("⚠️ Grafo 'usuarios_similares' não existia ou já foi removido.")
+
+# === Projeta um grafo entre usuários com base em filmes assistidos em comum ===
 gds.run_cypher("""
 CALL gds.graph.project.cypher(
   'usuarios_similares',
-  'Usuario',
-  $relationshipQuery
+  'MATCH (u:Usuario) RETURN id(u) AS id',
+  $relQuery
 )
 """, params={
-    'relationshipQuery': """
+    'relQuery': """
     MATCH (u1:Usuario)-[:ASSISTIU]->(f:Filme)<-[:ASSISTIU]-(u2:Usuario)
     WHERE u1 <> u2
-    RETURN u1 AS source, u2 AS target
+    RETURN id(u1) AS source, id(u2) AS target
     """
 })
 
-# -------------------------------
-# 2. Algoritmo de PageRank
-# -------------------------------
+# === Executa PageRank ===
 pagerank_result = gds.pageRank.stream("usuarios_similares")
-print("\n📊 PageRank:")
+print("\n📊 PageRank (usuários mais influentes):")
 for row in pagerank_result.limit(10).to_dataframe().itertuples():
-    print(f"{row.nodeName}: {row.score:.4f}")
+    usuario = usuarios_collection.find_one({"_id": ObjectId(str(row.nodeId))}) if ObjectId.is_valid(str(row.nodeId)) else None
+    if usuario:
+        print(f"👤 {usuario['nome']}: {row.score:.4f}")
 
-# -------------------------------
-# 3. Algoritmo de Comunidades (Louvain)
-# -------------------------------
+# === Executa Louvain (detecção de comunidades) ===
 louvain_result = gds.louvain.stream("usuarios_similares")
-print("\n🧩 Comunidades (Louvain):")
+print("\n🧩 Comunidades detectadas (Louvain):")
 for row in louvain_result.limit(10).to_dataframe().itertuples():
-    print(f"{row.nodeName}: comunidade {row.communityId}")
+    usuario = usuarios_collection.find_one({"_id": ObjectId(str(row.nodeId))}) if ObjectId.is_valid(str(row.nodeId)) else None
+    if usuario:
+        print(f"👥 {usuario['nome']} → Comunidade {row.communityId}")
